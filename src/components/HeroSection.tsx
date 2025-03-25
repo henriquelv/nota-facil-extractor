@@ -1,8 +1,7 @@
-
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, ChevronDown, Image } from 'lucide-react';
+import { Camera, Upload, ChevronDown, FileText } from 'lucide-react';
 import { toast } from "sonner";
 
 const HeroSection: React.FC = () => {
@@ -25,6 +24,9 @@ const HeroSection: React.FC = () => {
   
   const processReceipt = (file: File) => {
     setIsProcessing(true);
+    
+    // Display file type in toast for debugging
+    toast.info(`Processando arquivo: ${file.name} (${file.type})`);
     
     // Simulate OCR processing with a timeout
     // In a real implementation, this would be an API call to an OCR service
@@ -94,10 +96,15 @@ const HeroSection: React.FC = () => {
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.type.includes('image')) {
+      // Accept images, PDFs and other document formats
+      const acceptedTypes = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      
+      const isAccepted = acceptedTypes.some(type => file.type.includes(type));
+      
+      if (isAccepted) {
         processReceipt(file);
       } else {
-        toast.error("Por favor, envie apenas arquivos de imagem");
+        toast.error("Formato de arquivo não suportado. Por favor, envie imagens, PDFs ou documentos do Word.");
       }
     }
   };
@@ -105,10 +112,15 @@ const HeroSection: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.type.includes('image')) {
+      // Accept images, PDFs and other document formats
+      const acceptedTypes = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      
+      const isAccepted = acceptedTypes.some(type => file.type.includes(type));
+      
+      if (isAccepted) {
         processReceipt(file);
       } else {
-        toast.error("Por favor, envie apenas arquivos de imagem");
+        toast.error("Formato de arquivo não suportado. Por favor, envie imagens, PDFs ou documentos do Word.");
       }
     }
   };
@@ -183,7 +195,7 @@ const HeroSection: React.FC = () => {
           Extraia produtos de notas fiscais em segundos
         </h1>
         <p className="text-lg text-foreground/70 max-w-2xl mx-auto mb-10">
-          Tire uma foto ou envie a imagem da sua nota fiscal e transforme-a automaticamente em uma tabela editável com todos os detalhes dos produtos.
+          Tire uma foto ou envie a imagem/PDF da sua nota fiscal e transforme-a automaticamente em uma tabela editável com todos os detalhes dos produtos.
         </p>
         
         {!cameraActive ? (
@@ -201,18 +213,18 @@ const HeroSection: React.FC = () => {
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept="image/*"
+              accept="image/*,.pdf,.doc,.docx"
               className="hidden"
             />
             
             <div className="flex flex-col items-center justify-center gap-4">
               <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                <Image className="h-8 w-8 text-primary" />
+                <FileText className="h-8 w-8 text-primary" />
               </div>
               <div className="text-center">
                 <h3 className="text-lg font-medium mb-1">Envie sua nota fiscal</h3>
                 <p className="text-sm text-foreground/60 mb-4">
-                  Arraste e solte aqui ou selecione no seu dispositivo
+                  Arraste e solte aqui ou selecione no seu dispositivo (imagens, PDFs ou documentos)
                 </p>
                 <div className="flex flex-wrap gap-3 justify-center">
                   <Button 
