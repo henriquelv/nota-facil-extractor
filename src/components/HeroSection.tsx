@@ -1,14 +1,18 @@
 
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, ChevronDown, Image } from 'lucide-react';
+import { toast } from "sonner";
 
 const HeroSection: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const navigate = useNavigate();
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -19,22 +23,93 @@ const HeroSection: React.FC = () => {
     setIsDragging(false);
   };
   
+  const processReceipt = (file: File) => {
+    setIsProcessing(true);
+    
+    // Simulate OCR processing with a timeout
+    // In a real implementation, this would be an API call to an OCR service
+    setTimeout(() => {
+      setIsProcessing(false);
+      
+      // Mock data - in a real app, this would come from the OCR service
+      const mockProducts = [
+        {
+          id: '1',
+          name: 'Arroz Integral 1kg',
+          quantity: 2,
+          unitPrice: 8.99,
+          totalPrice: 17.98
+        },
+        {
+          id: '2',
+          name: 'Feijão Preto 1kg',
+          quantity: 1,
+          unitPrice: 6.49,
+          totalPrice: 6.49
+        },
+        {
+          id: '3',
+          name: 'Azeite de Oliva Extra Virgem 500ml',
+          quantity: 1,
+          unitPrice: 24.90,
+          totalPrice: 24.90
+        },
+        {
+          id: '4',
+          name: 'Café em Grãos 250g',
+          quantity: 2,
+          unitPrice: 15.90,
+          totalPrice: 31.80
+        },
+        {
+          id: '5',
+          name: 'Leite Integral 1L',
+          quantity: 3,
+          unitPrice: 4.99,
+          totalPrice: 14.97
+        }
+      ];
+      
+      const mockReceiptInfo = {
+        storeName: 'Supermercado Brasil',
+        date: '15/06/2023',
+        totalAmount: 96.14
+      };
+      
+      // Navigate to results page with the extracted data
+      navigate('/results', { 
+        state: { 
+          products: mockProducts,
+          receiptInfo: mockReceiptInfo
+        } 
+      });
+      
+      toast.success('Nota fiscal processada com sucesso!');
+    }, 3000);
+  };
+  
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      // Handle the file upload
-      console.log(e.dataTransfer.files[0]);
-      // Here you would process the file with OCR
+      const file = e.dataTransfer.files[0];
+      if (file.type.includes('image')) {
+        processReceipt(file);
+      } else {
+        toast.error("Por favor, envie apenas arquivos de imagem");
+      }
     }
   };
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      // Handle the file upload
-      console.log(e.target.files[0]);
-      // Here you would process the file with OCR
+      const file = e.target.files[0];
+      if (file.type.includes('image')) {
+        processReceipt(file);
+      } else {
+        toast.error("Por favor, envie apenas arquivos de imagem");
+      }
     }
   };
   
@@ -59,6 +134,7 @@ const HeroSection: React.FC = () => {
       setCameraActive(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
+      toast.error("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
     }
   };
   
@@ -81,12 +157,12 @@ const HeroSection: React.FC = () => {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         canvas.toBlob((blob) => {
           if (blob) {
-            // Handle the captured image
-            console.log("Captured image:", blob);
-            // Here you would process the image with OCR
+            // Convert blob to file
+            const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
+            processReceipt(file);
             deactivateCamera();
           }
-        });
+        }, 'image/jpeg');
       }
     }
   };
@@ -142,14 +218,25 @@ const HeroSection: React.FC = () => {
                   <Button 
                     onClick={openFileDialog}
                     className="button-bounce gap-2"
+                    disabled={isProcessing}
                   >
-                    <Upload className="h-4 w-4" />
-                    Selecionar Arquivo
+                    {isProcessing ? (
+                      <>
+                        <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Selecionar Arquivo
+                      </>
+                    )}
                   </Button>
                   <Button 
                     variant="outline" 
                     onClick={activateCamera}
                     className="button-bounce gap-2"
+                    disabled={isProcessing}
                   >
                     <Camera className="h-4 w-4" />
                     Usar Câmera
