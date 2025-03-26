@@ -22,72 +22,128 @@ const HeroSection: React.FC = () => {
     setIsDragging(false);
   };
   
-  const processReceipt = (file: File) => {
+  const processReceipt = async (file: File) => {
     setIsProcessing(true);
     
-    // Display file type in toast for debugging
-    toast.info(`Processando arquivo: ${file.name} (${file.type})`);
-    
-    // Simulate OCR processing with a timeout
-    // In a real implementation, this would be an API call to an OCR service
-    setTimeout(() => {
-      setIsProcessing(false);
-      
-      // Mock data - in a real app, this would come from the OCR service
-      const mockProducts = [
-        {
-          id: '1',
-          name: 'Arroz Integral 1kg',
-          quantity: 2,
-          unitPrice: 8.99,
-          totalPrice: 17.98
-        },
-        {
-          id: '2',
-          name: 'Feijão Preto 1kg',
-          quantity: 1,
-          unitPrice: 6.49,
-          totalPrice: 6.49
-        },
-        {
-          id: '3',
-          name: 'Azeite de Oliva Extra Virgem 500ml',
-          quantity: 1,
-          unitPrice: 24.90,
-          totalPrice: 24.90
-        },
-        {
-          id: '4',
-          name: 'Café em Grãos 250g',
-          quantity: 2,
-          unitPrice: 15.90,
-          totalPrice: 31.80
-        },
-        {
-          id: '5',
-          name: 'Leite Integral 1L',
-          quantity: 3,
-          unitPrice: 4.99,
-          totalPrice: 14.97
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      let extractedProducts = [];
+
+      const extractProductsFromText = (text: string) => {
+        const lines = text.split('\n');
+        const products = [];
+        
+        // Padrões de regex melhorados
+        const pricePattern = /R\$\s*(\d+[.,]\d{2})/;
+        const quantityPatterns = [
+          /(\d+)\s*[xX]\s*(?=R\$)/,  // Formato: "2 x R$"
+          /(\d+)\s*(?:UN|UNID|UND?|PÇ|PC)\b/i,  // Formatos: UN, UNID, UND, PÇ, PC
+          /QTD[E:]?\s*(\d+)/i,  // Formato: QTD: 2 ou QTDE 2
+          /(\d+)\s*(?=\s*(?:R\$|,|\.))/  // Número seguido de R$ ou vírgula/ponto
+        ];
+        
+        // Padrões para identificar linhas de produto
+        const productLinePatterns = [
+          /R\$\s*\d+[.,]\d{2}/,  // Linha contém preço
+          /\d+\s*(?:UN|UNID|UND?|PÇ|PC)\b/i,  // Linha contém unidade
+          /ITEM|PRODUTO|DESCRIÇÃO/i  // Linha contém palavras-chave
+        ];
+
+        let currentProduct = null;
+        
+        for (let line of lines) {
+          line = line.trim();
+          
+          // Verifica se a linha parece ser um produto
+          const isProductLine = productLinePatterns.some(pattern => pattern.test(line));
+          
+          if (isProductLine) {
+            // Extrai o preço
+            const priceMatch = line.match(pricePattern);
+            const unitPrice = priceMatch ? parseFloat(priceMatch[1].replace(',', '.')) : 0;
+            
+            // Extrai a quantidade usando vários padrões
+            let quantity = 1;
+            for (const pattern of quantityPatterns) {
+              const match = line.match(pattern);
+              if (match) {
+                quantity = parseInt(match[1]);
+                break;
+              }
+            }
+            
+            // Remove preços e quantidades do nome do produto
+            let name = line
+              .replace(pricePattern, '')
+              .replace(/(\d+)\s*(?:UN|UNID|UND?|PÇ|PC)\b/ig, '')
+              .replace(/QTD[E:]?\s*\d+/ig, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+            
+            // Remove códigos de produto comuns
+            name = name.replace(/^\d{1,6}\s*[-–]\s*/, '');
+            
+            // Se o nome não estiver vazio, adiciona o produto
+            if (name && unitPrice > 0) {
+              products.push({
+                id: `product-${products.length + 1}`,
+                name,
+                quantity,
+                unitPrice,
+                totalPrice: quantity * unitPrice
+              });
+            }
+          }
         }
-      ];
-      
-      const mockReceiptInfo = {
-        storeName: 'Supermercado Brasil',
-        date: '15/06/2023',
-        totalAmount: 96.14
+        
+        return products;
       };
-      
-      // Navigate to results page with the extracted data
+
+      if (file.type === 'application/pdf') {
+        const reader = new FileReader();
+        const text = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target?.result);
+          reader.onerror = (e) => reject(e);
+          reader.readAsText(file);
+        });
+
+        extractedProducts = extractProductsFromText(text as string);
+
+      } else if (file.type.includes('image/')) {
+        const { createWorker } = await import('tesseract.js');
+        const worker = await createWorker('por');
+        
+        const imageData = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result);
+          reader.readAsDataURL(file);
+        });
+
+        const { data: { text } } = await worker.recognize(imageData as string);
+        await worker.terminate();
+
+        extractedProducts = extractProductsFromText(text);
+      }
+
       navigate('/results', { 
         state: { 
-          products: mockProducts,
-          receiptInfo: mockReceiptInfo
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          uploadDate: new Date().toISOString(),
+          products: extractedProducts
         } 
       });
       
-      toast.success('Nota fiscal processada com sucesso!');
-    }, 3000);
+      toast.success('Arquivo processado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao processar arquivo:', error);
+      toast.error('Erro ao processar o arquivo. Por favor, tente novamente.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
   
   const handleDrop = (e: React.DragEvent) => {
